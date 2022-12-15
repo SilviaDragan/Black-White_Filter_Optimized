@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
+#include <math.h>
+#include <time.h>
 
+#define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 #define WHITE 255
 
 typedef struct {
