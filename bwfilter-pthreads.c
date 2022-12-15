@@ -7,6 +7,7 @@
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 #define WHITE 255
 
+
 typedef struct {
     unsigned char  fileMarker1;
     unsigned char  fileMarker2; /* 'M' */
@@ -35,6 +36,14 @@ typedef struct {
     unsigned int   biClrUsed;
     unsigned int   biClrImportant;
 } InfoHeader;
+
+typedef struct {
+    int no_of_threads;
+    int thread_id;
+    InfoHeader *infoHeader;
+    Pixel **image;
+    Pixel **bwImage;
+} threadArguments;
 
 Pixel **allocPixelMatrix(int lines, int columns) {
 	Pixel **image = (Pixel **)malloc(sizeof(Pixel *) * lines);
@@ -79,7 +88,6 @@ void writeImage(unsigned char pix1, unsigned char pix2, unsigned char pix3, FILE
 	fwrite(&pix3, sizeof(unsigned char), 1, out);
 }
 
-/*scrierea a structurilor FileHeader InfoHeader*/
 void write_header(FileHeader *fileHeader, InfoHeader *infoHeader, char *outfile) {
 	FILE *out=fopen(outfile, "wb");
 	if (out==NULL) {	
@@ -154,6 +162,29 @@ Pixel **read_bmp(char *fin, InfoHeader *infoHeader, FileHeader *fileHeader, Pixe
 	return image;
 }
 
+void *thread_function(void *arg) {
+    threadArguments* args = (threadArguments*) arg;
+    int no_of_threads = args->no_of_threads;
+    int thread_id = args->thread_id;
+    InfoHeader *infoHeader = args->infoHeader;
+    Pixel **image = args->image;
+    Pixel **bwImage = args->bwImage;
+
+	int start = thread_id * (double) infoHeader->width / no_of_threads;
+	int end = MIN((thread_id + 1) * (double) infoHeader->width / no_of_threads, infoHeader->width);
+
+	for (int i = infoHeader->height - 1; i >= 0; i--) {
+		for (int j = start; j < end; j++) {
+			int bwPixelValue = (image[i][j].R + image[i][j].G + image[i][j].B) / 3;
+            Pixel bwPixel;
+            bwPixel.R = (unsigned char) bwPixelValue;
+            bwPixel.G = (unsigned char) bwPixelValue;
+            bwPixel.B = (unsigned char) bwPixelValue;
+            bwImage[i][j] = bwPixel;
+		}
+	}
+}
+
 void applyBWFilter(Pixel **image, char *out_black_white, FileHeader *fileHeader, InfoHeader *infoHeader) {
 	FILE *out = fopen(out_black_white,"wb");
 	if (out == NULL) {
@@ -171,16 +202,24 @@ void applyBWFilter(Pixel **image, char *out_black_white, FileHeader *fileHeader,
 
     Pixel **bwImage = allocPixelMatrix(infoHeader->height, infoHeader->width);
 
-    // DE PARALELIZAT
-	for (int i = infoHeader->height - 1; i >= 0; i--) {
-		for (int j = 0; j < infoHeader->width; j++) {
-			int bwPixelValue = (image[i][j].R + image[i][j].G + image[i][j].B) / 3;
-            Pixel bwPixel;
-            bwPixel.R = (unsigned char) bwPixelValue;
-            bwPixel.G = (unsigned char) bwPixelValue;
-            bwPixel.B = (unsigned char) bwPixelValue;
-            bwImage[i][j] = bwPixel;
-		}
+    int P = 8;
+    pthread_t tid[P];
+	int thread_id[P];
+    threadArguments* threadArgs = (threadArguments *) calloc(P, sizeof(threadArguments));
+
+	for (int i = 0; i < P; i++) {
+		thread_id[i] = i;
+        threadArgs[i].no_of_threads = P;
+        threadArgs[i].thread_id = thread_id[i];
+        threadArgs[i].image = image;
+        threadArgs[i].bwImage = bwImage;
+        threadArgs[i].infoHeader = infoHeader;
+
+		pthread_create(&tid[i], NULL, thread_function, &threadArgs[i]);
+	}
+
+	for (int i = 0; i < P; i++) {
+		pthread_join(tid[i], NULL);
 	}
 
 	for (int i = infoHeader->height - 1; i >= 0; i--) {
@@ -195,18 +234,13 @@ void applyBWFilter(Pixel **image, char *out_black_white, FileHeader *fileHeader,
 	return;
 }
 
-void run_processing(Pixel **photoPixels, InfoHeader *info, FileHeader *fileHeader, char *in, char *out) {
-	photoPixels = read_bmp(in, info, fileHeader, photoPixels);
-	applyBWFilter(photoPixels, out, fileHeader, info);
-}
-
-
 int main() {
 	Pixel **pixels = NULL;
 	InfoHeader header;
 	FileHeader fileHeader;
 
-	run_processing(pixels, &header, &fileHeader, "input/input.bmp", "output/output.bmp");
-	
+    pixels = read_bmp("input/input.bmp", &header, &fileHeader, pixels);
+    applyBWFilter(pixels, "output/output_pthreads.bmp", &fileHeader, &header);
+
 	return 0;
 }

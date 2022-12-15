@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
+
 
 #define WHITE 255
 
 typedef struct {
-    unsigned char  fileMarker1;
+    unsigned char  fileMarker1; /* 'B' */
     unsigned char  fileMarker2; /* 'M' */
     unsigned int   bfSize; /* File's size */
     unsigned short unused1; /* Aplication specific */
@@ -191,18 +193,13 @@ void applyBWFilter(Pixel **image, char *out_black_white, FileHeader *fileHeader,
 	return;
 }
 
-void run_processing(Pixel **photoPixels, InfoHeader *info, FileHeader *fileHeader, char *in, char *out) {
-	photoPixels = read_bmp(in, info, fileHeader, photoPixels);
-	applyBWFilter(photoPixels, out, fileHeader, info);
-}
-
-
 int main() {
 	Pixel **pixels = NULL;
 	InfoHeader header;
 	FileHeader fileHeader;
 
-	run_processing(pixels, &header, &fileHeader, "input/input.bmp", "output/output.bmp");
-	
+    pixels = read_bmp("input/input.bmp", &header, &fileHeader, pixels);
+    applyBWFilter(pixels, "output/output.bmp", &fileHeader, &header);
+
 	return 0;
 }
