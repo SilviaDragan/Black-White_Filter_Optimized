@@ -2,8 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <mpi.h>
-#include <cstddef>
-
+#include <stddef.h>
 
 #define WHITE 255
 #define MASTER 0
@@ -197,7 +196,6 @@ void applyBWFilter(Pixel **image, char *out_black_white, FileHeader *fileHeader,
 
     Pixel **bwImage = allocPixelMatrix(infoHeader->height, infoHeader->width);
 
-    // DE PARALELIZAT
 	for (int i = infoHeader->height - 1; i >= 0; i--) {
 		for (int j = 0; j < infoHeader->width; j++) {
 			int bwPixelValue = (image[i][j].R + image[i][j].G + image[i][j].B) / 3;
@@ -231,91 +229,98 @@ int main(int argc, char **argv) {
 	InfoHeader infoHeader;
 	FileHeader fileHeader;
     MPI_Datatype pixelDataType = createPixelType();
+    FILE *out;
+    int pix, pad;
 
     if (rank == MASTER) {
         pixels = read_bmp("input/input.bmp", &infoHeader, &fileHeader, pixels);
-        FILE *out = fopen("output/output-mpi.bmp","wb");
+        out = fopen("output/output-mpi.bmp","wb");
         if (out == NULL) {
             printf("error openining file\n");
         }
 
         write_header(&fileHeader, &infoHeader, "output/output-mpi.bmp");
-        fseek(out, fileHeader->imageDataOffset, SEEK_SET);
+        fseek(out, fileHeader.imageDataOffset, SEEK_SET);
+        pix=3 * infoHeader.width;
+        pad = 0;
 
-        int pix=3 * infoHeader->width, pad = 0;
         while (pix % 4 != 0) {
             pix++;
             pad++;
         }
 
-        Pixel **bwImage = allocPixelMatrix(infoHeader->height, infoHeader->width);
+        Pixel **bwImage = allocPixelMatrix(infoHeader.height, infoHeader.width);
 
-        for (int p = 1; i < proc; i++) {
-            int start = i * (double) infoHeader->width / proc;
-	        int end = MIN((i + 1) * (double) infoHeader->width / proc, infoHeader->width);
-            
-            MPI_Send(infoHeader->height, 1, MPI_INT, p, MPI_ANY_TAG, MPI_COMM_WORLD);
-            MPI_Send(infoHeader->width, 1, MPI_INT, p, MPI_ANY_TAG, MPI_COMM_WORLD);
-            MPI_Send(start, 1, MPI_INT, p, MPI_ANY_TAG, MPI_COMM_WORLD);
-            MPI_Send(end, 1, MPI_INT, p, MPI_ANY_TAG, MPI_COMM_WORLD);
-            MPI_Send(&(pixels[0][0]), infoHeader->height * infoHeader->width, pixelDataType, p, IMAGE_TAG, MPI_COMM_WORLD);
-        }
-
-        // recv si scrie in bwImage
-        for (int p = 1; i < proc; i++) {
-                int start = i * (double) infoHeader->width / proc;
-	            int end = MIN((i + 1) * (double) infoHeader->width / proc, infoHeader->width);
-                MPI_Recv()
+        for (int p = 1; p < proc; p++) {
+            // printf("trimit master 1\n");
+            MPI_Send(&infoHeader.height, 1, MPI_INT, p, 0, MPI_COMM_WORLD);
+            MPI_Send(&infoHeader.width, 1, MPI_INT, p, 0, MPI_COMM_WORLD);
+            for (int i = 0; i < infoHeader.height; i++) {
+                MPI_Send(&(pixels[i][0]), infoHeader.width, pixelDataType, p, 0, MPI_COMM_WORLD);
             }
+            // printf("am trimis master 1\n");
 
-
-        // after calculations are done
-        for (int i = infoHeader->height - 1; i >= 0; i--) {
-            for (int j = 0; j < infoHeader->width; j++) {
-                writeImage(bwImage[i][j].R, bwImage[i][j].G, bwImage[i][j].B, out);
-            }
-            for (int k = 0 ;k < pad; k++) {
-                fputc(0, out);
-            }
         }
     } else {
         MPI_Status status;
-        int height, width, start, end;
+        int height, width;
         MPI_Recv(&height, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
         MPI_Recv(&width, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-        MPI_Recv(&start, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-        MPI_Recv(&end, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+        // printf("eu sunt rank %d\n", rank);
+        // printf("am primit h si w\n");
 
 	    Pixel **originalPicture = allocPixelMatrix(height, width);
 
         for (int i = 0; i < height; i++) {
-            for (j = 0; j < width; j++) {
-                MPI_Recv(&originalPicture[i][j], 1, pixelDataType, 0, IMAGE_TAG, MPI_COMM_WORLD, &status)
-            }
+            MPI_Recv(&originalPicture[i][0], width, pixelDataType, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
         }
 
-        // DE PARALELIZAT
-        for (int i = infoHeader->height - 1; i >= 0; i--) {
+        // printf("am primit liniile\n");
+
+        int start = rank * (double)width / proc;
+        int end = MIN((rank + 1) * (double) width / proc, width);
+
+        for (int i = height - 1; i >= 0; i--) {
             for (int j = start; j < end; j++) {
-                int bwPixelValue = (image[i][j].R + image[i][j].G + image[i][j].B) / 3;
+                int bwPixelValue = (originalPicture[i][j].R + originalPicture[i][j].G + originalPicture[i][j].B) / 3;
                 Pixel bwPixel;
                 bwPixel.R = (unsigned char) bwPixelValue;
                 bwPixel.G = (unsigned char) bwPixelValue;
                 bwPixel.B = (unsigned char) bwPixelValue;
-                // bwImage[i][j] = bwPixel;
-
-
+                originalPicture[i][j] = bwPixel;
             }
         }
 
+        // printf("am terminat de calculat\n");
+
+        for (int i = 0; i < height; i++) {
+            MPI_Send(&(originalPicture[i][i + start]), end - start, pixelDataType, MASTER, 0, MPI_COMM_WORLD);
+        }
+
+        // printf("am calculat si am trimis\n");
+    }
+
+    if (rank ==  MASTER) {
+        Pixel **bwImage = allocPixelMatrix(infoHeader.height, infoHeader.width);
+
+        for (int i = 0; i < infoHeader.height; i++) {
+            for (int p = 1; i < proc; i++) {
+                int pstart = p * (double) infoHeader.width / proc;
+                int pend = MIN((p + 1) * (double) infoHeader.width / proc, infoHeader.width);
+                MPI_Recv(&(bwImage[p][pstart + p]), pend - pstart, pixelDataType, p, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            }
+        }
+        // after calculations are done
+        for (int i = infoHeader.height - 1; i >= 0; i--) {
+            for (int j = 0; j < infoHeader.width; j++) {
+                writeImage(bwImage[i][j].R, bwImage[i][j].G, bwImage[i][j].B, out);
+            }
+            for (int k = 0 ; k < pad; k++) {
+                fputc(0, out);
+            }
+        }
     }
     
-
-    
-
-
-
-    // applyBWFilter(pixels, "output/output-mpi.bmp", &fileHeader, &infoHeader);
-
+    MPI_Finalize();
 	return 0;
 }
