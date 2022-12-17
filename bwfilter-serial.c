@@ -199,7 +199,7 @@ int main() {
 	FileHeader fileHeader;
 
     pixels = read_bmp("input/input.bmp", &header, &fileHeader, pixels);
-    applyBWFilter(pixels, "output/output.bmp", &fileHeader, &header);
+    applyBWFilter(pixels, "output/output-serial.bmp", &fileHeader, &header);
 
 	return 0;
 }
