@@ -54,13 +54,6 @@ Pixel **allocPixelMatrix(int lines, int columns) {
     return image;
 }
 
-void freeMatrix(int **mat, int n) {
-	for (int i = 0; i < n; i++) {
-        free(mat[i]);
-    }
-	free(mat);
-}
-
 void writePixels(Pixel **image, int height, int width, int pad, FILE *out) {
 	for (int i = height - 1; i >= 0; --i) {
 		for (int j = 0; j < width; j++) {
@@ -80,7 +73,6 @@ void writeImage(unsigned char pix1, unsigned char pix2, unsigned char pix3, FILE
 	fwrite(&pix3, sizeof(unsigned char), 1, out);
 }
 
-/*scrierea a structurilor FileHeader InfoHeader*/
 void write_header(FileHeader *fileHeader, InfoHeader *infoHeader, char *outfile) {
 	FILE *out=fopen(outfile, "wb");
 	if (out==NULL) {	
@@ -172,7 +164,6 @@ void applyBWFilter(Pixel **image, char *out_black_white, FileHeader *fileHeader,
 
     Pixel **bwImage = allocPixelMatrix(infoHeader->height, infoHeader->width);
 
-    // DE PARALELIZAT
     #pragma omp parallel
     {
         #pragma omp for
@@ -207,7 +198,7 @@ int main() {
 	FileHeader fileHeader;
 
     pixels = read_bmp("input/input.bmp", &header, &fileHeader, pixels);
-    applyBWFilter(pixels, "output/output.bmp", &fileHeader, &header);
+    applyBWFilter(pixels, "output/output-openmp.bmp", &fileHeader, &header);
 
 	return 0;
 }
