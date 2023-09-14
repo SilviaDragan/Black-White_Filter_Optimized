@@ -1,35 +1,26 @@
-Dragan Silvia 344C5
+# Optimization of Black and White Filter on .bmp Images using OpenMP, MPI, and Pthreads
 
-!!! IMPORTANT !!!: petru rulare si testare, va rog sa ma contactati pe teams (id 108290) sau la silvia.dragan@stud.acs.upb.ro deoarece nu este suficient spatiu pe moodle ca sa 
-pot include pozele de input/output. Altfel, se poate testa prin adaugarea unei imagini de tip .bmt in directorul ./input. Rezultatele se vor gasi in directorul ./output
-si sunt denumite corespunzator in functie de executabilul rulat.
+## Selected Problem:
+The proposed problem for parallelization involves applying a black & white filter to a .bmp image. The algorithm for applying the filter is based on calculating the arithmetic mean between the RGB values of the pixels in the initial image, represented as a matrix.
 
-Problema aleasa:
-Problema propusa spre paralelizare reprezinta aplicarea unui filtru black&white pe o imagine de tip .bmp
-Algoritmul de aplicare al filtrului se bazeaza pe calculul mediei aritmetice intre valorile RBG ale pixelilor din imaginea initiala,
-reprezentata sub forma de matrice.
+## Compilation Instructions:
+Use the following command to compile all solutions:
+make
 
-Pentru a compila:
-make - compileaza toate solutiile.s
+## Approach 1: OpenMP
+To run the OpenMP solution, execute: ./run_openmp
 
-Tema 1
-OpenMp:
-Pentru a rula: run_openmp
-Am paralelizat parcurgerea liniilor din matricea de pixeli in momentul calcularii valorii grayscale a fiecarui pixel.
+In this solution, we parallelize the traversal of rows in the pixel matrix during the calculation of the grayscale value of each pixel.
 
-MPI:
-Pentru a rula: run_openmp
-Procesul 0 se ocupa de citire si scriere.
-Dupa ce citeste si proceseaza informatiile despre imaginea originala, procesul 0
-trimite informatiile catre procesele worker.
-Procesele worker calculeaza valorile grayscale ale pixelilor din matrice pentru liniile
-asignate fiecaruia, apoi trimit liniile procesate la procesul 0. Procesul 0 primeste liniile procesate de workeri si asambleaza matricea pentru afisare.
+## Approach 2: MPI
+To run the MPI solution, execute: ./run_mpi
 
-Tema 2
-Pthreads:
-Pentru a rula: run_pthreads
-Fiecare thread proceseaza coloanele asignate din matrice.
+In this solution, Process 0 handles reading and writing. After reading and processing information about the original image, Process 0 sends the information to worker processes. The worker processes calculate the grayscale values of the pixels in the assigned rows and then send the processed rows back to Process 0. Process 0 receives the processed rows from workers and assembles the matrix for display.
 
-MPI-OpenMP
-Pentru a rula: run_hybrid
-Algoritm similar cu solutia MPI, dar adaugata paralelizarea parcurgerii liniilor asignate.
+## Approach 3: Pthreads
+To run the Pthreads solution, execute: run_pthreads
+In this solution, each thread processes the assigned columns in the matrix.
+
+## Approach 4: MPI-OpenMP (Hybrid solution)
+To run the hybrid MPI-OpenMP solution, execute:  ./run_hybrid
+This algorithm is similar to the MPI solution but includes parallelization of the traversal of assigned rows.
